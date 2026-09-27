@@ -1,0 +1,137 @@
+import { AuthorityRecord } from '@/types';
+
+/**
+ * Realistic DEMO authority records for Chhattisgarh jurisdictions.
+ * Clearly designated with isDemo: true in accordance with GovTech hackathon guidelines.
+ * No real personal names or private details are fabricated.
+ */
+export const DEMO_AUTHORITY_REGISTRY: AuthorityRecord[] = [
+  {
+    id: 'auth-cg-nhai-raipur',
+    authorityName: 'National Highways Authority of India (NHAI)',
+    department: 'Ministry of Road Transport and Highways (MoRTH)',
+    level: 'Central',
+    state: 'Chhattisgarh',
+    district: 'Raipur',
+    jurisdiction: 'National Highways Corridor (NH-30, NH-53, NH-130B) - Raipur Region',
+    roadCategories: ['national_highway'],
+    contactEmail: 'piu-raipur-demo@nhai.gov.in.sandbox',
+    portalUserId: 'officer-nhai-01',
+    escalationAuthority: 'Regional Office NHAI, Chhattisgarh Zone',
+    active: true,
+    isDemo: true,
+  },
+  {
+    id: 'auth-cg-pwd-sh',
+    authorityName: 'Chhattisgarh Public Works Department (CG PWD)',
+    department: 'State Highways & Capital Project Division',
+    level: 'State',
+    state: 'Chhattisgarh',
+    district: 'Raipur',
+    jurisdiction: 'State Highways (SH-5, SH-9, SH-22) - Raipur Division',
+    roadCategories: ['state_highway'],
+    contactEmail: 'ee-pwd-sh-raipur@cg.gov.in.sandbox',
+    portalUserId: 'officer-pwd-sh-01',
+    escalationAuthority: 'Chief Engineer (State Highways), CG PWD',
+    active: true,
+    isDemo: true,
+  },
+  {
+    id: 'auth-cg-rmc-urban',
+    authorityName: 'Raipur Municipal Corporation (RMC)',
+    department: 'Urban Infrastructure & Public Works Cell',
+    level: 'Municipal',
+    state: 'Chhattisgarh',
+    district: 'Raipur',
+    jurisdiction: 'Raipur Urban Municipal Limits & Inner Arterial Roads',
+    roadCategories: ['municipal_road'],
+    contactEmail: 'commissioner-works@rmcraipur.gov.in.sandbox',
+    portalUserId: 'officer-rmc-01',
+    escalationAuthority: 'Urban Administration & Development Dept, Chhattisgarh',
+    active: true,
+    isDemo: true,
+  },
+  {
+    id: 'auth-cg-pwd-mdr',
+    authorityName: 'Chhattisgarh PWD - Major District Roads',
+    department: 'District Roads & Bridges Division',
+    level: 'District',
+    state: 'Chhattisgarh',
+    district: 'Raipur',
+    jurisdiction: 'Major District Roads (MDR) & Other District Roads (ODR)',
+    roadCategories: ['district_road'],
+    contactEmail: 'ee-pwd-district-raipur@cg.gov.in.sandbox',
+    portalUserId: 'officer-pwd-dist-01',
+    escalationAuthority: 'Superintending Engineer, Raipur Circle',
+    active: true,
+    isDemo: true,
+  },
+  {
+    id: 'auth-cg-cgrrda-rural',
+    authorityName: 'Chhattisgarh Rural Road Development Agency (CGRRDA)',
+    department: 'Panchayat & Rural Development Department',
+    level: 'Panchayat',
+    state: 'Chhattisgarh',
+    district: 'Raipur',
+    jurisdiction: 'Rural Connectivity & Pradhan Mantri Gram Sadak Yojana (PMGSY)',
+    roadCategories: ['rural_road', 'village_internal_road'],
+    contactEmail: 'piu-cgrrda-raipur@pmgsy.nic.in.sandbox',
+    portalUserId: 'officer-pmgsy-01',
+    escalationAuthority: 'Chief Executive Officer, CGRRDA Raipur',
+    active: true,
+    isDemo: true,
+  },
+  {
+    id: 'auth-cg-bilaspur-nhai',
+    authorityName: 'NHAI Project Implementation Unit (Bilaspur)',
+    department: 'MoRTH',
+    level: 'Central',
+    state: 'Chhattisgarh',
+    district: 'Bilaspur',
+    jurisdiction: 'NH-130 & NH-49 Bilaspur Corridors',
+    roadCategories: ['national_highway'],
+    contactEmail: 'piu-bilaspur-demo@nhai.gov.in.sandbox',
+    portalUserId: 'officer-nhai-bsp-01',
+    escalationAuthority: 'RO Raipur NHAI',
+    active: true,
+    isDemo: true,
+  },
+  {
+    id: 'auth-cg-bmc-urban',
+    authorityName: 'Bilaspur Municipal Corporation (BMC)',
+    department: 'Engineering & Roads Wing',
+    level: 'Municipal',
+    state: 'Chhattisgarh',
+    district: 'Bilaspur',
+    jurisdiction: 'Bilaspur City Municipal Limits',
+    roadCategories: ['municipal_road'],
+    contactEmail: 'commissioner@bmcbilaspur.gov.in.sandbox',
+    portalUserId: 'officer-bmc-01',
+    escalationAuthority: 'Urban Development Department, Chhattisgarh',
+    active: true,
+    isDemo: true,
+  },
+  {
+    id: 'auth-cg-general-fallback',
+    authorityName: 'District Road Safety Committee (DRSC)',
+    department: 'District Collectorate & Transport Department',
+    level: 'District',
+    state: 'Chhattisgarh',
+    district: 'Raipur',
+    jurisdiction: 'General District Road Network & Unclassified Roads',
+    roadCategories: ['other'],
+    contactEmail: 'drsc-nodal@raipur.cg.gov.in.sandbox',
+    portalUserId: 'officer-drsc-01',
+    escalationAuthority: 'District Collector & Magistrate, Raipur',
+    active: true,
+    isDemo: true,
+  }
+];
+
+export function getAuthorityById(id: string): AuthorityRecord | undefined {
+  return DEMO_AUTHORITY_REGISTRY.find(auth => auth.id === id);
+}
+
+export function getAllAuthorities(): AuthorityRecord[] {
+  return DEMO_AUTHORITY_REGISTRY;
+}
