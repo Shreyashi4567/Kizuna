@@ -13,48 +13,6 @@ export const HazardAnalysisSchema = z.object({
 });
 
 /**
- * Fallback heuristic analyzer strictly for benchmark demonstration samples (KZ-DEMO-001).
- * Never used for real citizen photograph uploads.
- */
-function getFallbackRoadAnalysis(fileNameOrHint?: string): HazardAnalysis {
-  const hint = (fileNameOrHint || '').toLowerCase();
-
-  if (hint.includes('divider') || hint.includes('barrier')) {
-    return {
-      hazardType: 'damaged_divider',
-      severity: 'critical',
-      confidence: 0.94,
-      description: 'Shattered median barrier segment with structural disruption toward oncoming traffic lane.',
-      requiresAttention: true,
-      visibleRoadClues: ['Urban carriageway', 'Concrete median curbing'],
-      additionalHazards: ['Exposed reinforcement edges', 'Fallen concrete fragments'],
-    };
-  }
-
-  if (hint.includes('crack') || hint.includes('surface')) {
-    return {
-      hazardType: 'road_surface_damage',
-      severity: 'medium',
-      confidence: 0.91,
-      description: 'Alligator cracking and structural bitumen degradation with expanding surface fractures.',
-      requiresAttention: true,
-      visibleRoadClues: ['Asphalt driving lane', 'Shoulder demarcation line'],
-      additionalHazards: ['Moisture seepage into road sub-base'],
-    };
-  }
-
-  return {
-    hazardType: 'pothole',
-    severity: 'high',
-    confidence: 0.95,
-    description: 'Prominent asphalt crater with fractured edge perimeter posing significant tire blow-out and two-wheeler loss-of-balance risk.',
-    requiresAttention: true,
-    visibleRoadClues: ['Multi-lane paved carriageway', 'Tire wear patterns'],
-    additionalHazards: ['Loose aggregate scattering across travel lane'],
-  };
-}
-
-/**
  * Validates uploaded image properties before dispatching to Groq Vision.
  */
 function validateImageData(base64Data: string, mimeType: string): { dataUrl: string; cleanBase64: string } {
@@ -69,13 +27,11 @@ function validateImageData(base64Data: string, mimeType: string): { dataUrl: str
     throw new Error(`Unsupported image format (${mimeType}). KIZUNA requires JPEG, PNG, or WebP.`);
   }
 
-  // Ensure clean base64 and valid data URL
   const cleanBase64 = base64Data.replace(/^data:image\/[a-z0-9.+]+;base64,/, '');
   if (cleanBase64.length < 100) {
     throw new Error('Malformed image upload: Image payload contains insufficient byte data.');
   }
 
-  // Check approximate size (base64 length * 0.75)
   const approxSizeBytes = cleanBase64.length * 0.75;
   const MAX_SIZE_BYTES = 20 * 1024 * 1024; // 20MB limit
   if (approxSizeBytes > MAX_SIZE_BYTES) {
@@ -89,29 +45,19 @@ function validateImageData(base64Data: string, mimeType: string): { dataUrl: str
 /**
  * Analyzes a real road hazard photograph using Groq Vision API.
  * Uses current multimodal vision models (qwen/qwen3.8-27b with Llama vision fallback).
- * Never hallucinates or substitutes fake data for real uploads.
+ * Never hallucinates or substitutes fake data.
  */
 export async function analyzeRoadPhotograph(
   base64Data: string,
-  mimeType: string = 'image/jpeg',
-  fileNameHint?: string,
-  isDemoSample: boolean = false
+  mimeType: string = 'image/jpeg'
 ): Promise<HazardAnalysis> {
-  const isDemo = isDemoSample || Boolean(fileNameHint?.startsWith('DEMO:'));
-
   // 1. Verify Groq API Configuration
   if (!isGroqConfigured) {
-    if (isDemo) {
-      return getFallbackRoadAnalysis(fileNameHint);
-    }
     throw new Error('AI image analysis is not configured. Add GROQ_API_KEY to .env.local.');
   }
 
   const groq = getGroqClient();
   if (!groq) {
-    if (isDemo) {
-      return getFallbackRoadAnalysis(fileNameHint);
-    }
     throw new Error('AI image analysis request failed: Groq client could not be initialized.');
   }
 
@@ -208,9 +154,6 @@ Return ONLY a valid JSON object strictly matching this structure:
   }
 
   if (!text) {
-    if (isDemo) {
-      return getFallbackRoadAnalysis(fileNameHint);
-    }
     const message = lastError instanceof Error ? lastError.message : String(lastError || 'No response returned');
     throw new Error(`AI image analysis request failed: ${message}`);
   }
@@ -218,7 +161,6 @@ Return ONLY a valid JSON object strictly matching this structure:
   try {
     const parsed = JSON.parse(text);
 
-    // Normalize confidence between 0.0 and 1.0
     let conf = typeof parsed.confidence === 'number' ? parsed.confidence : 0.85;
     if (conf > 1) conf = conf / 100;
     conf = Math.min(1, Math.max(0.05, conf));
@@ -240,9 +182,6 @@ Return ONLY a valid JSON object strictly matching this structure:
     return validated;
   } catch (parseErr) {
     console.error('Failed to parse Groq vision JSON response:', text, parseErr);
-    if (isDemo) {
-      return getFallbackRoadAnalysis(fileNameHint);
-    }
     throw new Error('AI image analysis request failed: Groq vision returned an unparseable response.');
   }
 }

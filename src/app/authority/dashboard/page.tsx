@@ -3,10 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { RoadCase } from '@/types';
-import { getAllCases } from '@/lib/store';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PriorityBadge } from '@/components/PriorityBadge';
-import { CaseTypeBadge } from '@/components/CaseTypeBadge';
 import { MapView, MapMarker } from '@/components/MapView';
 import { DEMO_AUTHORITY_REGISTRY } from '@/lib/authority/registry';
 import {
@@ -18,14 +16,14 @@ import {
   ArrowRight,
   Landmark,
   Building,
-  Sparkles,
-  Radio,
+  Inbox,
+  PlusCircle,
 } from 'lucide-react';
 
 export default function AuthorityDashboardPage() {
-  const [cases, setCases] = useState<RoadCase[]>(() => getAllCases());
+  const [cases, setCases] = useState<RoadCase[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedAuthorityId, setSelectedAuthorityId] = useState<string>('ALL');
-  const [typeFilter, setTypeFilter] = useState<'ALL' | 'LIVE' | 'DEMO'>('ALL');
 
   useEffect(() => {
     fetch('/api/cases')
@@ -35,33 +33,19 @@ export default function AuthorityDashboardPage() {
           setCases(data.cases);
         }
       })
-      .catch(err => console.warn('Authority cases sync notice:', err));
+      .catch(err => console.warn('Authority cases sync notice:', err))
+      .finally(() => setLoading(false));
   }, []);
-
-  const liveCasesCount = cases.filter(c => !c.isDemo && !c.id.startsWith('KZ-DEMO-')).length;
-  const demoCasesCount = cases.filter(c => Boolean(c.isDemo || c.id.startsWith('KZ-DEMO-'))).length;
 
   const activeCasesList = cases
     .filter(c => {
-      const isDemo = Boolean(c.isDemo || c.id.startsWith('KZ-DEMO-'));
       const matchesAuth =
         selectedAuthorityId === 'ALL' || c.authorityRouting.authorityId === selectedAuthorityId;
-      const matchesType =
-        typeFilter === 'ALL' ||
-        (typeFilter === 'LIVE' && !isDemo) ||
-        (typeFilter === 'DEMO' && isDemo);
-      return matchesAuth && matchesType;
+      return matchesAuth;
     })
-    // Sort: Live cases first, then newest
-    .sort((a, b) => {
-      const aLive = !a.isDemo && !a.id.startsWith('KZ-DEMO-');
-      const bLive = !b.isDemo && !b.id.startsWith('KZ-DEMO-');
-      if (aLive && !bLive) return -1;
-      if (!aLive && bLive) return 1;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  // Metrics
+  // Metrics directly from live operational data
   const totalActive = activeCasesList.filter(c => c.status !== 'RESOLVED').length;
   const criticalCount = activeCasesList.filter(c => c.priorityAssessment.priority === 'CRITICAL' && c.status !== 'RESOLVED').length;
   const highCount = activeCasesList.filter(c => c.priorityAssessment.priority === 'HIGH' && c.status !== 'RESOLVED').length;
@@ -99,7 +83,7 @@ export default function AuthorityDashboardPage() {
           </p>
         </div>
 
-        {/* Authority Division Filter & Demo Link */}
+        {/* Authority Division Filter */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl shadow-xs">
             <Building className="w-4 h-4 text-slate-400" />
@@ -119,41 +103,14 @@ export default function AuthorityDashboardPage() {
           </div>
 
           <Link
-            href="/authority/cases/KZ-DEMO-001"
-            className="px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs font-bold hover:bg-amber-100 transition flex items-center gap-1.5"
+            href="/authority/cases"
+            className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            <span>Open Demo Case</span>
+            <span>Manage All Cases</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
       </div>
-
-      {/* Live Reports Alert Banner (If Live Citizen Reports Exist) */}
-      {liveCasesCount > 0 && (
-        <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-center gap-3">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-600" />
-            </span>
-            <div>
-              <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                {liveCasesCount} Active Live Citizen Submission(s) in Intake Docket
-              </h4>
-              <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5">
-                Real photographs and browser GPS coordinates submitted by community members require departmental review.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setTypeFilter('LIVE')}
-            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition shadow-xs"
-          >
-            Filter Live Reports
-          </button>
-        </div>
-      )}
 
       {/* KPI Command Metrics Ribbon */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -165,7 +122,7 @@ export default function AuthorityDashboardPage() {
             {totalActive}
           </span>
           <span className="text-[10px] text-slate-400 mt-0.5 block">
-            {liveCasesCount} Live / {demoCasesCount} Benchmark
+            {cases.length} Total Registered
           </span>
         </div>
 
@@ -220,137 +177,132 @@ export default function AuthorityDashboardPage() {
         </div>
       </div>
 
-      {/* GIS Command Map + Urgent Action Queue */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: GIS Interactive Map */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-blue-600" />
-                  Territorial Road Safety GIS Command Map
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Pin locations color-coded by AI-assisted priority tier (Crimson: Critical, Amber: High).
-                </p>
-              </div>
-
-              {/* Mode Toggle: All vs Live vs Demo */}
-              <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-0.5 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setTypeFilter('ALL')}
-                  className={`px-2.5 py-1 rounded-md font-semibold transition ${
-                    typeFilter === 'ALL'
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                      : 'text-slate-500'
-                  }`}
-                >
-                  All ({cases.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTypeFilter('LIVE')}
-                  className={`px-2.5 py-1 rounded-md font-semibold transition flex items-center gap-1 ${
-                    typeFilter === 'LIVE'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'text-slate-500'
-                  }`}
-                >
-                  <Radio className="w-3 h-3" /> Live ({liveCasesCount})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTypeFilter('DEMO')}
-                  className={`px-2.5 py-1 rounded-md font-semibold transition ${
-                    typeFilter === 'DEMO'
-                      ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
-                      : 'text-slate-500'
-                  }`}
-                >
-                  Demo ({demoCasesCount})
-                </button>
-              </div>
-            </div>
-
-            <MapView
-              markers={mapMarkers}
-              centerLat={mapMarkers[0]?.latitude || 21.2514}
-              centerLng={mapMarkers[0]?.longitude || 81.6296}
-              zoom={13}
-              height="380px"
-            />
+      {loading ? (
+        <div className="p-12 text-center text-slate-500 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+          <div className="animate-pulse space-y-2">
+            <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/4 mx-auto" />
+            <div className="text-xs">Loading operational authority docket from Supabase...</div>
           </div>
         </div>
-
-        {/* Right Col: Urgent Priority Queue */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <Flame className="w-4 h-4 text-rose-600" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Immediate Priority Queue
-                </h3>
-              </div>
-              <Link
-                href="/authority/cases"
-                className="text-xs text-blue-600 font-semibold hover:underline"
-              >
-                Full Docket
-              </Link>
-            </div>
-
-            <div className="space-y-3">
-              {activeCasesList
-                .filter(c => c.status !== 'RESOLVED')
-                .slice(0, 5)
-                .map(c => (
-                  <Link
-                    key={c.id}
-                    href={`/authority/cases/${c.id}`}
-                    className="block p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-blue-400 bg-slate-50/50 dark:bg-slate-800/40 transition group"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-1 mb-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-[11px] font-bold text-slate-900 dark:text-slate-100">
-                          {c.id}
-                        </span>
-                        <CaseTypeBadge isDemo={c.isDemo} size="sm" />
-                      </div>
-                      <PriorityBadge priority={c.priorityAssessment.priority} size="sm" />
-                    </div>
-
-                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 transition truncate">
-                      {c.location.roadName}
-                    </h4>
-
-                    <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                      {c.location.locality} • {c.hazardAnalysis.hazardType.replace('_', ' ')}
-                    </p>
-
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-[10px]">
-                      <StatusBadge status={c.status} size="sm" />
-                      <span className="text-blue-600 dark:text-blue-400 font-bold group-hover:translate-x-0.5 transition flex items-center gap-0.5">
-                        Action Docket <ArrowRight className="w-2.5 h-2.5" />
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-            </div>
+      ) : cases.length === 0 ? (
+        <div className="p-16 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center mx-auto">
+            <Inbox className="w-8 h-8" />
           </div>
-
-          <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+              No live reports yet
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1">
+              All departmental dockets are clear. Reports submitted by citizens with real road photos and GPS coordinates will appear here for review and dispatch.
+            </p>
+          </div>
+          <div>
             <Link
-              href="/authority/cases"
-              className="w-full py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold text-center block transition"
+              href="/citizen/report"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs"
             >
-              Open Complete Department Docket
+              <PlusCircle className="w-4 h-4" />
+              <span>Submit a Real Hazard Report</span>
             </Link>
           </div>
         </div>
-      </div>
+      ) : (
+        /* GIS Command Map + Urgent Action Queue */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left 2 Cols: GIS Interactive Map */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-blue-600" />
+                    Territorial Road Safety GIS Command Map
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Live operational incidents color-coded by priority tier.
+                  </p>
+                </div>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                  {activeCasesList.length} Active On Map
+                </span>
+              </div>
+
+              <MapView
+                markers={mapMarkers}
+                centerLat={mapMarkers[0]?.latitude || 21.2514}
+                centerLng={mapMarkers[0]?.longitude || 81.6296}
+                zoom={13}
+                height="380px"
+              />
+            </div>
+          </div>
+
+          {/* Right Col: Urgent Priority Queue */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-rose-600" />
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Immediate Priority Queue
+                  </h3>
+                </div>
+                <Link
+                  href="/authority/cases"
+                  className="text-xs text-blue-600 font-semibold hover:underline"
+                >
+                  Full Docket
+                </Link>
+              </div>
+
+              <div className="space-y-3">
+                {activeCasesList
+                  .filter(c => c.status !== 'RESOLVED')
+                  .slice(0, 5)
+                  .map(c => (
+                    <Link
+                      key={c.id}
+                      href={`/authority/cases/${c.id}`}
+                      className="block p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-blue-400 bg-slate-50/50 dark:bg-slate-800/40 transition group"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-1 mb-1.5">
+                        <span className="font-mono text-[11px] font-bold text-slate-900 dark:text-slate-100">
+                          {c.id}
+                        </span>
+                        <PriorityBadge priority={c.priorityAssessment.priority} size="sm" />
+                      </div>
+
+                      <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 transition truncate">
+                        {c.location.roadName}
+                      </h4>
+
+                      <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                        {c.location.locality} • {c.hazardAnalysis.hazardType.replace('_', ' ')}
+                      </p>
+
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-[10px]">
+                        <StatusBadge status={c.status} size="sm" />
+                        <span className="text-blue-600 dark:text-blue-400 font-bold group-hover:translate-x-0.5 transition flex items-center gap-0.5">
+                          Action Docket <ArrowRight className="w-2.5 h-2.5" />
+                        </span>
+                      </div>
+                    </Link>
+                  ))}
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <Link
+                href="/authority/cases"
+                className="w-full py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold text-center block transition"
+              >
+                Open Complete Department Docket
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

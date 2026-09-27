@@ -147,7 +147,7 @@ export interface ResolutionVerification {
 }
 
 export interface RoadCase {
-  id: string; // e.g. KZ-2026-00124 or KZ-DEMO-001
+  id: string; // e.g. KZ-2026-00124
   citizenId: string;
   imageUrl: string;
   location: LocationData;

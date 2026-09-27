@@ -1,25 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllCases, createCase } from '@/lib/store';
+import { fetchCasesAsync, createCaseAsync } from '@/lib/store';
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get('status');
-    const priority = searchParams.get('priority');
-    const authorityId = searchParams.get('authorityId');
+    const status = searchParams.get('status') || undefined;
+    const priority = searchParams.get('priority') || undefined;
+    const authorityId = searchParams.get('authorityId') || undefined;
 
-    let cases = getAllCases();
-
-    if (status) {
-      cases = cases.filter(c => c.status.toLowerCase() === status.toLowerCase());
-    }
-    if (priority) {
-      cases = cases.filter(c => c.priorityAssessment.priority.toLowerCase() === priority.toLowerCase());
-    }
-    if (authorityId) {
-      cases = cases.filter(c => c.authorityRouting.authorityId === authorityId);
-    }
-
+    const cases = await fetchCasesAsync({ status, priority, authorityId });
     return NextResponse.json({ cases });
   } catch (error: unknown) {
     console.error('Error fetching cases:', error);
@@ -42,7 +31,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const created = createCase(caseData);
+    const created = await createCaseAsync(caseData);
     return NextResponse.json(created, { status: 201 });
   } catch (error: unknown) {
     console.error('Error creating case:', error);

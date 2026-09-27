@@ -55,12 +55,7 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <Link href="/citizen/reports" className="hover:text-blue-600 transition">
-                  My Reports Docket
-                </Link>
-              </li>
-              <li>
-                <Link href="/citizen/reports/KZ-DEMO-001" className="hover:text-blue-600 transition">
-                  Interactive Demo Case (NH-30)
+                  Public Reports Docket
                 </Link>
               </li>
             </ul>
@@ -85,11 +80,6 @@ export const Footer: React.FC = () => {
               <li>
                 <Link href="/authority/map" className="hover:text-blue-600 transition">
                   Territorial GIS Hotspots
-                </Link>
-              </li>
-              <li>
-                <Link href="/authority/cases/KZ-DEMO-001" className="hover:text-blue-600 transition">
-                  Authority Case Action Desk
                 </Link>
               </li>
             </ul>

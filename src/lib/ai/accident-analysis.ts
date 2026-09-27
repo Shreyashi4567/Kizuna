@@ -47,112 +47,10 @@ async function geocodeIncidentLocation(
 }
 
 /**
- * Deterministic fallback extractor strictly for demo benchmarks (KZ-DEMO-001).
- * Never used for live citizen uploads.
- */
-function extractDeterministicAccidentEvents(
-  articles: RawNewsArticle[],
-  roadName: string,
-  locality: string,
-  citizenLat?: number,
-  citizenLng?: number
-): AccidentIntelligenceResult {
-  const events: AccidentEvent[] = articles.map((art, idx) => {
-    const text = `${art.title} ${art.description}`.toLowerCase();
-    const roadLower = roadName.toLowerCase();
-    const locLower = locality.toLowerCase();
-
-    let relevance: AccidentRelevance = 'LOW';
-    let relevanceReason = 'General regional accident reference.';
-
-    const matchesRoad =
-      text.includes(roadLower) ||
-      (roadLower.includes('nh-30') && text.includes('nh-30')) ||
-      (roadLower.includes('ge road') && (text.includes('ge road') || text.includes('great eastern')));
-
-    const matchesLocality = text.includes(locLower);
-
-    if (matchesRoad && matchesLocality) {
-      relevance = 'HIGH';
-      relevanceReason = `Direct match for road corridor (${roadName}) and specific locality (${locality}).`;
-    } else if (matchesRoad) {
-      relevance = 'HIGH';
-      relevanceReason = `Direct match for road corridor (${roadName}).`;
-    } else if (matchesLocality) {
-      relevance = 'MEDIUM';
-      relevanceReason = `Matches locality (${locality}) but specific road segment unconfirmed in headline.`;
-    } else {
-      relevance = 'LOW';
-      relevanceReason = 'District level mention without verified corridor match.';
-    }
-
-    let eventType: AccidentEventType = 'collision';
-    if (text.includes('fatal') || text.includes('succumbed') || text.includes('dead')) {
-      eventType = 'fatal_accident';
-    } else if (text.includes('overturn') || text.includes('rollover')) {
-      eventType = 'overturning';
-    } else if (text.includes('pedestrian') || text.includes('crossing')) {
-      eventType = 'pedestrian_accident';
-    } else if (text.includes('crash') || text.includes('rammed')) {
-      eventType = 'crash';
-    }
-
-    let severity: 'minor' | 'moderate' | 'serious' | 'fatal' = 'moderate';
-    if (text.includes('fatal') || text.includes('dead')) severity = 'fatal';
-    else if (text.includes('serious') || text.includes('critical') || text.includes('hospital')) severity = 'serious';
-    else if (text.includes('minor') || text.includes('fender')) severity = 'minor';
-
-    const eventDate = art.publishedAt ? art.publishedAt.split('T')[0] : null;
-
-    let incidentLat: number | undefined;
-    let incidentLng: number | undefined;
-    let distanceKm: number | undefined;
-
-    if (citizenLat !== undefined && citizenLng !== undefined) {
-      const offsets = [
-        { dLat: 0.012, dLng: 0.018, dist: 2.4 },
-        { dLat: -0.045, dLng: 0.021, dist: 5.8 },
-        { dLat: 0.082, dLng: -0.035, dist: 11.2 },
-        { dLat: -0.15, dLng: -0.08, dist: 19.5 },
-      ];
-      const offset = offsets[idx % offsets.length];
-      incidentLat = citizenLat + offset.dLat;
-      incidentLng = citizenLng + offset.dLng;
-      distanceKm = calculateDistanceKm(citizenLat, citizenLng, incidentLat, incidentLng);
-    }
-
-    return {
-      id: `acc-demo-${idx}-${Date.now()}`,
-      date: eventDate,
-      location: `${roadName}, ${locality}`,
-      eventType,
-      severity,
-      casualties: severity === 'fatal' ? 1 : 0,
-      source: art.source?.name || 'Local News Archive',
-      url: art.url || '#',
-      title: art.title,
-      snippet: art.description || undefined,
-      relevance,
-      relevanceReason,
-      latitude: incidentLat,
-      longitude: incidentLng,
-      distanceKm,
-      dateConfidence: eventDate ? 'EXACT' : 'UNKNOWN',
-    };
-  });
-
-  const highRelevance = events.filter(e => e.relevance === 'HIGH');
-  return {
-    events,
-    totalFound: events.length,
-    highRelevanceCount: highRelevance.length,
-    summary: `Identified ${events.length} benchmark road safety incident(s) within the 100 km radius.`,
-  };
-}
-
 /**
  * Analyzes candidate accident news using Groq AI and OpenStreetMap geocoding.
  * Filters strictly to <= 100 km radius from the citizen's GPS coordinates.
+ * Never fabricates or synthesizes fake accident events.
  */
 export async function analyzeAccidentIntelligence(
   articles: RawNewsArticle[],
@@ -161,8 +59,7 @@ export async function analyzeAccidentIntelligence(
   district: string,
   state: string,
   citizenLat?: number,
-  citizenLng?: number,
-  isDemo: boolean = false
+  citizenLng?: number
 ): Promise<AccidentIntelligenceResult> {
   if (articles.length === 0) {
     return {
@@ -173,11 +70,7 @@ export async function analyzeAccidentIntelligence(
     };
   }
 
-  // Demo fallback strictly when Groq is unconfigured and demo mode is requested
   if (!isGroqConfigured) {
-    if (isDemo) {
-      return extractDeterministicAccidentEvents(articles, roadName, locality, citizenLat, citizenLng);
-    }
     return {
       events: [],
       totalFound: 0,
@@ -188,9 +81,6 @@ export async function analyzeAccidentIntelligence(
 
   const groq = getGroqClient();
   if (!groq) {
-    if (isDemo) {
-      return extractDeterministicAccidentEvents(articles, roadName, locality, citizenLat, citizenLng);
-    }
     return {
       events: [],
       totalFound: 0,
@@ -373,9 +263,6 @@ Return JSON in this format:
     };
   } catch (err) {
     console.error('Error during Groq accident extraction:', err);
-    if (isDemo) {
-      return extractDeterministicAccidentEvents(articles, roadName, locality, citizenLat, citizenLng);
-    }
     return {
       events: [],
       totalFound: 0,

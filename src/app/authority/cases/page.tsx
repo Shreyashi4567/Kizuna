@@ -3,28 +3,26 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { RoadCase } from '@/types';
-import { getAllCases } from '@/lib/store';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PriorityBadge } from '@/components/PriorityBadge';
-import { CaseTypeBadge } from '@/components/CaseTypeBadge';
 import { DEMO_AUTHORITY_REGISTRY } from '@/lib/authority/registry';
 import {
   Search,
   Filter,
   ExternalLink,
   Landmark,
-  Sparkles,
   Building,
-  Radio,
+  Inbox,
+  PlusCircle,
 } from 'lucide-react';
 
 export default function AuthorityCasesPage() {
-  const [cases, setCases] = useState<RoadCase[]>(() => getAllCases());
+  const [cases, setCases] = useState<RoadCase[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
   const [authorityFilter, setAuthorityFilter] = useState('ALL');
-  const [typeFilter, setTypeFilter] = useState<'ALL' | 'LIVE' | 'DEMO'>('ALL');
 
   useEffect(() => {
     fetch('/api/cases')
@@ -34,21 +32,12 @@ export default function AuthorityCasesPage() {
           setCases(data.cases);
         }
       })
-      .catch(err => console.warn('Cases sync notice:', err));
+      .catch(err => console.warn('Cases sync notice:', err))
+      .finally(() => setLoading(false));
   }, []);
-
-  const liveCasesCount = cases.filter(c => !c.isDemo && !c.id.startsWith('KZ-DEMO-')).length;
-  const demoCasesCount = cases.filter(c => Boolean(c.isDemo || c.id.startsWith('KZ-DEMO-'))).length;
 
   const filteredCases = cases
     .filter(c => {
-      const isDemo = Boolean(c.isDemo || c.id.startsWith('KZ-DEMO-'));
-
-      const matchesType =
-        typeFilter === 'ALL' ||
-        (typeFilter === 'LIVE' && !isDemo) ||
-        (typeFilter === 'DEMO' && isDemo);
-
       const matchesSearch =
         c.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         c.location.roadName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -65,16 +54,9 @@ export default function AuthorityCasesPage() {
       const matchesAuth =
         authorityFilter === 'ALL' || c.authorityRouting.authorityId === authorityFilter;
 
-      return matchesType && matchesSearch && matchesStatus && matchesPriority && matchesAuth;
+      return matchesSearch && matchesStatus && matchesPriority && matchesAuth;
     })
-    // Sort: Live citizen cases first, then newest
-    .sort((a, b) => {
-      const aLive = !a.isDemo && !a.id.startsWith('KZ-DEMO-');
-      const bLive = !b.isDemo && !b.id.startsWith('KZ-DEMO-');
-      if (aLive && !bLive) return -1;
-      if (!aLive && bLive) return 1;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full space-y-6">
@@ -95,11 +77,10 @@ export default function AuthorityCasesPage() {
         </div>
 
         <Link
-          href="/authority/cases/KZ-DEMO-001"
-          className="px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs font-bold hover:bg-amber-100 transition flex items-center gap-1.5"
+          href="/authority/dashboard"
+          className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold transition flex items-center gap-1.5"
         >
-          <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-          <span>Launch Demo Case Desk (NH-30)</span>
+          <span>Operations Command</span>
         </Link>
       </div>
 
@@ -117,45 +98,6 @@ export default function AuthorityCasesPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-          {/* Live vs Demo Segmented Buttons */}
-          <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-0.5 text-xs">
-            <button
-              type="button"
-              onClick={() => setTypeFilter('ALL')}
-              className={`px-3 py-1 rounded-md font-semibold transition ${
-                typeFilter === 'ALL'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              All ({cases.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setTypeFilter('LIVE')}
-              className={`px-3 py-1 rounded-md font-semibold transition flex items-center gap-1 ${
-                typeFilter === 'LIVE'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              <Radio className="w-3 h-3" />
-              <span>Live ({liveCasesCount})</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTypeFilter('DEMO')}
-              className={`px-3 py-1 rounded-md font-semibold transition flex items-center gap-1 ${
-                typeFilter === 'DEMO'
-                  ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              <Sparkles className="w-3 h-3" />
-              <span>Demo ({demoCasesCount})</span>
-            </button>
-          </div>
-
           {/* Authority Filter */}
           <div className="flex items-center gap-1 text-xs">
             <Building className="w-3.5 h-3.5 text-slate-400" />
@@ -216,7 +158,6 @@ export default function AuthorityCasesPage() {
           <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
             <tr>
               <th className="py-3.5 px-4">Case ID</th>
-              <th className="py-3.5 px-4">Origin</th>
               <th className="py-3.5 px-4">Hazard &amp; Road Segment</th>
               <th className="py-3.5 px-4">Assigned Authority</th>
               <th className="py-3.5 px-4">Priority</th>
@@ -226,10 +167,33 @@ export default function AuthorityCasesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70 text-slate-700 dark:text-slate-300">
-            {filteredCases.length === 0 ? (
+            {loading ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-slate-400 font-medium">
-                  No cases found matching your filters.
+                <td colSpan={7} className="py-12 text-center text-slate-400 font-medium">
+                  Loading authority cases from Supabase...
+                </td>
+              </tr>
+            ) : filteredCases.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="py-16 text-center text-slate-400 font-medium">
+                  <div className="max-w-sm mx-auto space-y-3">
+                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+                      <Inbox className="w-6 h-6" />
+                    </div>
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      No reports found in the docket
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Reports submitted by citizens will appear here in real-time.
+                    </p>
+                    <Link
+                      href="/citizen/report"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" />
+                      <span>Submit Real Report</span>
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ) : (
@@ -240,9 +204,6 @@ export default function AuthorityCasesPage() {
                 >
                   <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-slate-100">
                     <span>{c.id}</span>
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <CaseTypeBadge isDemo={c.isDemo} size="sm" />
                   </td>
                   <td className="py-3.5 px-4">
                     <span className="font-semibold text-slate-900 dark:text-slate-100 block">

@@ -134,7 +134,9 @@ export default function CitizenCaseTrackingPage() {
             </div>
 
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
-              {caseData.location.roadName}
+              {(!caseData.location.roadName || caseData.location.roadName.includes('unavailable'))
+                ? 'Road name unavailable'
+                : caseData.location.roadName}
             </h1>
 
             <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-1 font-sans">

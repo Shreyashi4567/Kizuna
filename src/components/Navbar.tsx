@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Shield, PlusCircle, LayoutDashboard, MapPin, Sparkles, Menu, X, Landmark, FileText } from 'lucide-react';
+import { Shield, PlusCircle, LayoutDashboard, MapPin, Menu, X, Landmark, FileText } from 'lucide-react';
 import { NotificationDropdown } from './NotificationDropdown';
 
 export const Navbar: React.FC = () => {
@@ -142,15 +142,7 @@ export const Navbar: React.FC = () => {
               </>
             )}
 
-            {/* Quick Demo Access Button */}
-            <Link
-              href="/citizen/reports/KZ-DEMO-001"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 hover:bg-amber-100 transition"
-              title="Experience live demo case"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-              <span>Try Demo Case</span>
-            </Link>
+
 
             {/* Notifications */}
             <NotificationDropdown currentRole={isAuthority ? 'authority' : 'citizen'} />
@@ -211,13 +203,7 @@ export const Navbar: React.FC = () => {
             >
               <PlusCircle className="w-4 h-4" /> Report Road Issue
             </Link>
-            <Link
-              href="/citizen/reports/KZ-DEMO-001"
-              onClick={() => setMobileMenuOpen(false)}
-              className="p-2 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold flex items-center justify-center gap-1.5"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-600" /> Open Demo Case (NH-30)
-            </Link>
+
             <Link
               href="/citizen/reports"
               onClick={() => setMobileMenuOpen(false)}

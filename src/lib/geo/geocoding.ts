@@ -19,8 +19,8 @@ export interface GeocodedLocation extends LocationData {
 
 export interface GeocodingProvider {
   name: string;
-  reverse(lat: number, lon: number): Promise<GeocodedLocation>;
-  forward(query: string): Promise<GeocodedLocation | null>;
+  reverse(lat: number, lon: number, userRoadName?: string): Promise<GeocodedLocation>;
+  forward(query: string, userRoadName?: string): Promise<GeocodedLocation | null>;
 }
 
 // ============================================================================
@@ -52,9 +52,9 @@ const reverseCache = new Map<string, CacheEntry<GeocodedLocation>>();
 const forwardCache = new Map<string, CacheEntry<GeocodedLocation | null>>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-function getCacheKey(lat: number, lon: number): string {
+function getCacheKey(lat: number, lon: number, userRoadName?: string): string {
   // Round to 4 decimal places (~11 meters) for spatial caching
-  return `${lat.toFixed(4)},${lon.toFixed(4)}`;
+  return `${lat.toFixed(4)},${lon.toFixed(4)}:${userRoadName?.trim().toLowerCase() || ''}`;
 }
 
 // ============================================================================
@@ -65,8 +65,8 @@ class NominatimProvider implements GeocodingProvider {
   private userAgent =
     process.env.GEOCODING_USER_AGENT || 'KizunaRoadSafety/1.0 (kizuna-safety@sewasetu.gov.in)';
 
-  async reverse(lat: number, lon: number): Promise<GeocodedLocation> {
-    const cacheKey = getCacheKey(lat, lon);
+  async reverse(lat: number, lon: number, userRoadName?: string): Promise<GeocodedLocation> {
+    const cacheKey = getCacheKey(lat, lon, userRoadName);
     const cached = reverseCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.data;
@@ -103,7 +103,8 @@ class NominatimProvider implements GeocodingProvider {
         addr.cycleway ||
         '';
 
-      const roadName = road.trim() ? road.trim() : 'Road name unavailable from open map data';
+      // Priority: 1. User-entered road name, 2. OSM returned road, 3. 'Road name unavailable'
+      const roadName = userRoadName?.trim() || (road.trim() ? road.trim() : 'Road name unavailable');
 
       const locality =
         addr.suburb ||
@@ -133,7 +134,7 @@ class NominatimProvider implements GeocodingProvider {
 
       const formattedAddress =
         data.display_name ||
-        [roadName !== 'Road name unavailable from open map data' ? roadName : '', locality, city, district, state]
+        [roadName !== 'Road name unavailable' ? roadName : '', locality, city, district, state]
           .filter(Boolean)
           .join(', ');
 
@@ -154,7 +155,7 @@ class NominatimProvider implements GeocodingProvider {
         formattedAddress,
         rawAddress: addr,
         geocoderProvider: this.name,
-        source: 'gps',
+        source: userRoadName ? 'manual' : 'gps',
       };
 
       reverseCache.set(cacheKey, { data: result, expiresAt: Date.now() + CACHE_TTL_MS });
@@ -162,31 +163,32 @@ class NominatimProvider implements GeocodingProvider {
     } catch (err) {
       console.warn('Nominatim reverse geocode failed or timed out:', err);
 
-      // Return honest fallback with precise coordinates and clear unavailability notice
+      const roadName = userRoadName?.trim() || 'Road name unavailable';
       const fallback: GeocodedLocation = {
         latitude: lat,
         longitude: lon,
-        roadName: 'Road name unavailable from open map data',
+        roadName,
         roadPlaceId: `osm_${Math.abs(Math.round(lat * 10000))}`,
-        roadCategory: 'municipal_road',
+        roadCategory: classifyRoadCategory(roadName, ''),
         locality: 'Location recorded',
         district: 'Administrative Area',
         state: 'Local Jurisdiction',
         pincode: '',
         formattedAddress: `Lat ${lat.toFixed(5)}, Lng ${lon.toFixed(5)}`,
         geocoderProvider: `${this.name} (Offline/Unavailable)`,
-        source: 'gps',
+        source: userRoadName ? 'manual' : 'gps',
       };
 
       return fallback;
     }
   }
 
-  async forward(query: string): Promise<GeocodedLocation | null> {
+  async forward(query: string, userRoadName?: string): Promise<GeocodedLocation | null> {
     const cleanQuery = query.trim().toLowerCase();
     if (!cleanQuery) return null;
 
-    const cached = forwardCache.get(cleanQuery);
+    const cacheKey = `${cleanQuery}:${userRoadName?.trim().toLowerCase() || ''}`;
+    const cached = forwardCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.data;
     }
@@ -210,7 +212,7 @@ class NominatimProvider implements GeocodingProvider {
       });
 
       if (!results || results.length === 0) {
-        forwardCache.set(cleanQuery, { data: null, expiresAt: Date.now() + CACHE_TTL_MS });
+        forwardCache.set(cacheKey, { data: null, expiresAt: Date.now() + CACHE_TTL_MS });
         return null;
       }
 
@@ -226,14 +228,19 @@ class NominatimProvider implements GeocodingProvider {
         addr.street ||
         '';
 
-      const roadName = road.trim() ? road.trim() : 'Road name unavailable from open map data';
+      // Priority: 1. User-entered road, 2. OSM returned road, 3. 'Road name unavailable'
+      const roadName = userRoadName?.trim() || (road.trim() ? road.trim() : 'Road name unavailable');
       const locality = addr.suburb || addr.neighbourhood || addr.city_district || '';
       const city = addr.city || addr.town || addr.village || '';
       const district = addr.state_district || addr.county || city || 'District';
       const state = addr.state || 'State';
       const pincode = addr.postcode || '';
 
-      const formattedAddress = match.display_name || query;
+      const formattedAddress =
+        [roadName !== 'Road name unavailable' ? roadName : '', locality, city, district, state]
+          .filter(Boolean)
+          .join(', ') || match.display_name || query;
+
       const roadCategory: RoadCategory = classifyRoadCategory(roadName, formattedAddress);
 
       const result: GeocodedLocation = {
@@ -254,7 +261,7 @@ class NominatimProvider implements GeocodingProvider {
         source: 'manual',
       };
 
-      forwardCache.set(cleanQuery, { data: result, expiresAt: Date.now() + CACHE_TTL_MS });
+      forwardCache.set(cacheKey, { data: result, expiresAt: Date.now() + CACHE_TTL_MS });
       return result;
     } catch (err) {
       console.warn('Nominatim forward geocoding failed:', err);
@@ -276,19 +283,22 @@ export function setGeocodingProvider(provider: GeocodingProvider): void {
 /**
  * Reverse geocodes coordinates using the active open provider.
  */
-export async function reverseGeocode(lat: number, lon: number): Promise<GeocodedLocation> {
-  return activeProvider.reverse(lat, lon);
+export async function reverseGeocode(lat: number, lon: number, userRoadName?: string): Promise<GeocodedLocation> {
+  return activeProvider.reverse(lat, lon, userRoadName);
 }
 
 /**
  * Forward geocodes an address or location query using the active open provider.
  */
-export async function forwardGeocode(query: string): Promise<GeocodedLocation | null> {
-  return activeProvider.forward(query);
+export async function forwardGeocode(query: string, userRoadName?: string): Promise<GeocodedLocation | null> {
+  return activeProvider.forward(query, userRoadName);
 }
 
 /**
  * Forward geocodes a structured manual location (city, locality, road).
+ * Robust 3-tier fallback query strategy to ensure coordinates are resolved even
+ * when hyper-local street names are not yet indexed in OpenStreetMap.
+ * Always strictly preserves user-entered road name.
  */
 export async function forwardGeocodeStructured(parts: {
   road?: string;
@@ -297,9 +307,44 @@ export async function forwardGeocodeStructured(parts: {
   district?: string;
   state?: string;
 }): Promise<GeocodedLocation | null> {
-  const query = [parts.road, parts.locality, parts.city, parts.district, parts.state]
-    .filter(Boolean)
-    .join(', ');
+  const userRoad = parts.road?.trim() || '';
+  const userLocality = parts.locality?.trim() || '';
+  const userCity = parts.city?.trim() || '';
+  const userDistrict = parts.district?.trim() || '';
+  const userState = parts.state?.trim() || '';
 
-  return forwardGeocode(query);
+  // Tier 1: Detailed query with road + locality + city
+  const queryCandidates: string[] = [];
+  if (userRoad) {
+    queryCandidates.push([userRoad, userLocality, userCity, userDistrict, userState].filter(Boolean).join(', '));
+  }
+  // Tier 2: Locality + City (in case userRoad is unmapped or unindexed in OSM)
+  if (userLocality || userCity) {
+    queryCandidates.push([userLocality, userCity, userDistrict, userState].filter(Boolean).join(', '));
+  }
+  // Tier 3: City + District + State
+  if (userCity || userDistrict) {
+    queryCandidates.push([userCity, userDistrict, userState].filter(Boolean).join(', '));
+  }
+
+  for (const q of queryCandidates) {
+    const loc = await forwardGeocode(q, userRoad);
+    if (loc) {
+      // Strictly preserve user-entered fields on the resolved location
+      if (userRoad) {
+        loc.roadName = userRoad;
+        loc.roadCategory = classifyRoadCategory(userRoad, loc.formattedAddress);
+      }
+      if (userLocality && (!loc.locality || loc.locality === 'District')) {
+        loc.locality = userLocality;
+      }
+      if (userCity && (!loc.district || loc.district === 'District')) {
+        loc.district = userCity;
+      }
+      loc.source = 'manual';
+      return loc;
+    }
+  }
+
+  return null;
 }

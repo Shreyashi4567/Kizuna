@@ -8,25 +8,29 @@ import {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { latitude, longitude, manualQuery, manualParts } = body;
+    const { latitude, longitude, manualQuery, manualParts, userRoadName, fallbackRoadName } = body;
+    const preferredRoad = (userRoadName || fallbackRoadName || '').trim() || undefined;
 
     // 1. Manual Location Entry Fallback
     if (manualParts && (manualParts.city || manualParts.locality || manualParts.road)) {
       const location = await forwardGeocodeStructured(manualParts);
       if (!location) {
         return NextResponse.json(
-          { error: 'Unable to identify the entered location. Please check the city or locality.' },
+          { error: 'Unable to identify coordinates for the entered location. Please check the city or locality name.' },
           { status: 404 }
         );
+      }
+      if (preferredRoad) {
+        location.roadName = preferredRoad;
       }
       return NextResponse.json(location);
     }
 
     if (manualQuery && typeof manualQuery === 'string') {
-      const location = await forwardGeocode(manualQuery);
+      const location = await forwardGeocode(manualQuery, preferredRoad);
       if (!location) {
         return NextResponse.json(
-          { error: 'Unable to identify the entered location. Please check the spelling or specify the district.' },
+          { error: 'Unable to identify coordinates for the entered location query.' },
           { status: 404 }
         );
       }
@@ -41,7 +45,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const location = await reverseGeocode(latitude, longitude);
+    const location = await reverseGeocode(latitude, longitude, preferredRoad);
 
     return NextResponse.json(location);
   } catch (error: unknown) {

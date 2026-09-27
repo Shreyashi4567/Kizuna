@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCaseById, updateCaseStatus } from '@/lib/store';
+import { fetchCaseByIdAsync, updateCaseStatusAsync } from '@/lib/store';
 
 export async function GET(
   req: NextRequest,
@@ -7,7 +7,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const found = getCaseById(id);
+    const found = await fetchCaseByIdAsync(id);
 
     if (!found) {
       return NextResponse.json({ error: 'Case not found' }, { status: 404 });
@@ -36,7 +36,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'status is required' }, { status: 400 });
     }
 
-    const updated = updateCaseStatus(id, status, {
+    const updated = await updateCaseStatusAsync(id, status, {
       actorName,
       comment,
       officer,

@@ -16,7 +16,7 @@ interface RealityCheckCardProps {
 }
 
 export const RealityCheckCard: React.FC<RealityCheckCardProps> = ({ roadCase }) => {
-  const isDemo = Boolean(roadCase.isDemo ?? roadCase.id.startsWith('KZ-DEMO-'));
+  const isDemo = Boolean(roadCase.isDemo);
   const meta = roadCase.realityMetadata;
 
   return (
@@ -53,7 +53,7 @@ export const RealityCheckCard: React.FC<RealityCheckCardProps> = ({ roadCase }) 
           <div className="text-[11px] text-slate-600 dark:text-slate-300">
             <div className="flex justify-between">
               <span className="text-slate-400">Origin:</span>
-              <span className="font-semibold">{meta?.photoSource === 'USER_UPLOAD' ? 'Real User Upload' : 'Demo Test Photo'}</span>
+              <span className="font-semibold">{meta?.photoSource === 'USER_UPLOAD' ? 'Real User Upload' : 'Field Photo Evidence'}</span>
             </div>
             {meta?.photoFileName && (
               <div className="flex justify-between truncate">
@@ -82,9 +82,7 @@ export const RealityCheckCard: React.FC<RealityCheckCardProps> = ({ roadCase }) 
               <span className="font-semibold">
                 {roadCase.location.source === 'gps'
                   ? 'Live Browser GPS'
-                  : roadCase.location.source === 'manual'
-                  ? 'Manual Coordinates'
-                  : 'Corridor Preset'}
+                  : 'Manual Coordinates'}
               </span>
             </div>
             <div className="flex justify-between font-mono">

@@ -1,13 +1,12 @@
 import { RoadCase, InAppNotification, CaseStatus, CaseTimelineEntry, ResolutionVerification } from '@/types';
-import { DEMO_CASES, DEMO_NOTIFICATIONS } from './demo-data';
-import { getServerSupabase, isServerSupabaseConfigured } from './supabase/server';
+import { isServerSupabaseConfigured } from './supabase/server';
 
-// In-memory runtime cache for server-side operations and client fallback
-let memoryCases: RoadCase[] = [...DEMO_CASES];
-let memoryNotifications: InAppNotification[] = [...DEMO_NOTIFICATIONS];
+// Pure runtime memory cache for active requests (starts completely empty, no fake/demo data)
+let memoryCases: RoadCase[] = [];
+let memoryNotifications: InAppNotification[] = [];
 
-const STORAGE_KEY_CASES = 'kizuna_cases_v2';
-const STORAGE_KEY_NOTIFS = 'kizuna_notifications_v2';
+const STORAGE_KEY_CASES = 'kizuna_live_cases';
+const STORAGE_KEY_NOTIFS = 'kizuna_live_notifications';
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined';
@@ -19,20 +18,14 @@ function loadFromLocalStorage(): void {
     const rawCases = localStorage.getItem(STORAGE_KEY_CASES);
     if (rawCases) {
       const parsed: RoadCase[] = JSON.parse(rawCases);
-      // Ensure demo cases are present alongside any user-submitted live cases
-      const userCases = parsed.filter(c => !c.id.startsWith('KZ-DEMO-'));
-      memoryCases = [...userCases, ...DEMO_CASES];
-    } else {
-      localStorage.setItem(STORAGE_KEY_CASES, JSON.stringify(DEMO_CASES));
-      memoryCases = [...DEMO_CASES];
+      // Filter out any legacy demo cases if present in browser storage
+      memoryCases = parsed.filter(c => !c.id.startsWith('KZ-DEMO-'));
     }
 
     const rawNotifs = localStorage.getItem(STORAGE_KEY_NOTIFS);
     if (rawNotifs) {
-      memoryNotifications = JSON.parse(rawNotifs);
-    } else {
-      localStorage.setItem(STORAGE_KEY_NOTIFS, JSON.stringify(DEMO_NOTIFICATIONS));
-      memoryNotifications = [...DEMO_NOTIFICATIONS];
+      const parsedNotifs: InAppNotification[] = JSON.parse(rawNotifs);
+      memoryNotifications = parsedNotifs.filter(n => !n.caseId.startsWith('KZ-DEMO-'));
     }
   } catch (err) {
     console.warn('Could not read from localStorage, using memory storage:', err);
@@ -63,6 +56,66 @@ export function getCaseById(id: string): RoadCase | undefined {
   return memoryCases.find(c => c.id.toLowerCase() === id.toLowerCase());
 }
 
+/**
+ * Async fetcher that queries Supabase PostgreSQL as primary source of truth.
+ * Returns only real reports from Supabase.
+ */
+export async function fetchCasesAsync(filters?: {
+  status?: string;
+  priority?: string;
+  authorityId?: string;
+}): Promise<RoadCase[]> {
+  try {
+    const { fetchReportsFromSupabase } = await import('./supabase/reports');
+    const supabaseReports = await fetchReportsFromSupabase(filters);
+
+    if (supabaseReports !== null) {
+      // Supabase is the source of truth
+      memoryCases = supabaseReports;
+      syncToLocalStorage();
+      return memoryCases;
+    }
+  } catch (err) {
+    console.warn('Supabase fetch notice, using fallback cache:', err);
+  }
+
+  let cases = getAllCases();
+  if (filters?.status) {
+    cases = cases.filter(c => c.status.toLowerCase() === filters.status!.toLowerCase());
+  }
+  if (filters?.priority) {
+    cases = cases.filter(c => c.priorityAssessment.priority.toLowerCase() === filters.priority!.toLowerCase());
+  }
+  if (filters?.authorityId) {
+    cases = cases.filter(c => c.authorityRouting.authorityId === filters.authorityId);
+  }
+  return cases;
+}
+
+/**
+ * Async fetcher for a single case by ID from Supabase.
+ */
+export async function fetchCaseByIdAsync(id: string): Promise<RoadCase | undefined> {
+  try {
+    const { fetchReportByIdFromSupabase } = await import('./supabase/reports');
+    const fromSupabase = await fetchReportByIdFromSupabase(id);
+    if (fromSupabase) {
+      const idx = memoryCases.findIndex(c => c.id.toLowerCase() === id.toLowerCase());
+      if (idx !== -1) {
+        memoryCases[idx] = fromSupabase;
+      } else {
+        memoryCases.unshift(fromSupabase);
+      }
+      syncToLocalStorage();
+      return fromSupabase;
+    }
+  } catch (err) {
+    console.warn(`Supabase fetch notice for case ${id}:`, err);
+  }
+
+  return getCaseById(id);
+}
+
 export function createCase(
   newCase: Omit<RoadCase, 'id' | 'createdAt' | 'updatedAt' | 'timeline'> & { id?: string }
 ): RoadCase {
@@ -72,8 +125,7 @@ export function createCase(
 
   const year = new Date().getFullYear();
   const randomSuffix = Math.floor(10000 + Math.random() * 90000);
-  const isDemo = Boolean(newCase.isDemo ?? (newCase.id?.startsWith('KZ-DEMO-')));
-  const caseId = newCase.id || (isDemo ? `KZ-DEMO-${randomSuffix}` : `KZ-${year}-${randomSuffix}`);
+  const caseId = newCase.id || `KZ-${year}-${randomSuffix}`;
   const now = new Date().toISOString();
 
   const initialTimeline: CaseTimelineEntry[] = [
@@ -81,9 +133,7 @@ export function createCase(
       id: `tl-${Date.now()}-1`,
       status: 'REPORTED',
       title: 'Road Hazard Reported',
-      comment: isDemo
-        ? 'Pre-configured benchmark incident loaded into verification docket.'
-        : 'Citizen submitted photographic evidence with browser GPS coordinates.',
+      comment: 'Citizen submitted photographic evidence with browser GPS coordinates.',
       timestamp: now,
       actor: 'Reporting Citizen',
       actorRole: 'CITIZEN',
@@ -91,10 +141,10 @@ export function createCase(
     {
       id: `tl-${Date.now()}-2`,
       status: 'AI_ANALYZED',
-      title: 'AI Vision & 100km Precedent Analysis Complete',
+      title: 'Groq Vision Analysis Complete',
       comment: `Vision AI detected ${newCase.hazardAnalysis.severity} severity ${newCase.hazardAnalysis.hazardType.replace('_', ' ')}. Cross-referenced with news precedents within 100 km radius.`,
       timestamp: now,
-      actor: 'KIZUNA AI Core',
+      actor: 'Groq Vision AI',
       actorRole: 'SYSTEM_AI',
     },
     {
@@ -111,12 +161,12 @@ export function createCase(
   const fullCase: RoadCase = {
     ...newCase,
     id: caseId,
-    isDemo,
+    isDemo: false,
     createdAt: now,
     updatedAt: now,
     timeline: initialTimeline,
     realityMetadata: newCase.realityMetadata || {
-      photoSource: isDemo ? 'DEMO_SAMPLE' : 'USER_UPLOAD',
+      photoSource: 'USER_UPLOAD',
       locationSource: newCase.location.source === 'gps' ? 'BROWSER_GPS' : 'MANUAL_COORDINATES',
       gpsAccuracyMeters: newCase.location.gpsAccuracy,
       geocodingProvider: newCase.location.roadPlaceId?.startsWith('osm_') ? 'OPENSTREETMAP_NOMINATIM' : 'GOOGLE_ROADS_GEOCODING',
@@ -157,44 +207,6 @@ export function createCase(
 
   memoryNotifications.unshift(authNotification, citizenNotification);
   syncToLocalStorage();
-
-  // Async Cloud Persistence via Supabase if configured
-  if (isServerSupabaseConfigured) {
-    try {
-      const supabase = getServerSupabase();
-      if (supabase) {
-        supabase
-          .from('cases')
-          .insert({
-            id: fullCase.id,
-            citizen_id: fullCase.citizenId,
-            authority_id: fullCase.authorityRouting.authorityId,
-            image_url: fullCase.imageUrl,
-            location_data: fullCase.location,
-            hazard_analysis: fullCase.hazardAnalysis,
-            accident_intelligence: fullCase.accidentIntelligence,
-            authority_routing: fullCase.authorityRouting,
-            priority_assessment: fullCase.priorityAssessment,
-            priority: fullCase.priorityAssessment.priority,
-            status: fullCase.status,
-            citizen_report_count: fullCase.citizenReportCount,
-            is_demo: Boolean(fullCase.isDemo),
-            created_at: fullCase.createdAt,
-            updated_at: fullCase.updatedAt,
-          })
-          .then(
-            ({ error }) => {
-              if (error) console.warn('Supabase case insertion notice:', error.message);
-            },
-            (err: unknown) => {
-              console.warn('Supabase sync notice:', err);
-            }
-          );
-      }
-    } catch (err) {
-      console.warn('Supabase persistence attempt caught error:', err);
-    }
-  }
 
   return fullCase;
 }
@@ -268,7 +280,6 @@ export function updateCaseStatus(
     actorRole: 'AUTHORITY',
   });
 
-  // Notify citizen about status change
   const notif: InAppNotification = {
     id: `notif-${Date.now()}`,
     userId: target.citizenId,
@@ -283,40 +294,66 @@ export function updateCaseStatus(
   memoryNotifications.unshift(notif);
 
   syncToLocalStorage();
+  return target;
+}
 
-  // Async Cloud Persistence via Supabase if configured
-  if (isServerSupabaseConfigured) {
-    try {
-      const supabase = getServerSupabase();
-      if (supabase) {
-        supabase
-          .from('cases')
-          .update({
-            status,
-            updated_at: now,
-            acknowledged_at: target.acknowledgedAt,
-            assigned_at: target.assignedAt,
-            resolved_at: target.resolvedAt,
-            assigned_officer: target.assignedOfficer,
-            resolution_notes: target.resolutionNotes,
-            resolution_evidence: target.resolutionEvidence,
-          })
-          .eq('id', target.id)
-          .then(
-            ({ error }) => {
-              if (error) console.warn('Supabase status update notice:', error.message);
-            },
-            (err: unknown) => {
-              console.warn('Supabase update notice:', err);
-            }
-          );
-      }
-    } catch (err) {
-      console.warn('Supabase status update caught error:', err);
+/**
+ * Creates a new report with primary persistence in Supabase PostgreSQL & Storage.
+ */
+export async function createCaseAsync(
+  newCase: Omit<RoadCase, 'id' | 'createdAt' | 'updatedAt' | 'timeline'> & { id?: string }
+): Promise<RoadCase> {
+  try {
+    const { insertReportToSupabase } = await import('./supabase/reports');
+    const createdInSupabase = await insertReportToSupabase(newCase);
+    if (createdInSupabase) {
+      memoryCases.unshift(createdInSupabase);
+      syncToLocalStorage();
+      return createdInSupabase;
     }
+  } catch (err) {
+    console.warn('Supabase createReport notice, falling back to local store:', err);
   }
 
-  return target;
+  return createCase(newCase);
+}
+
+/**
+ * Updates a report status with primary persistence in Supabase PostgreSQL & Storage.
+ */
+export async function updateCaseStatusAsync(
+  caseId: string,
+  status: CaseStatus,
+  options?: {
+    actorName?: string;
+    comment?: string;
+    officer?: { name: string; badgeId: string; division: string };
+    resolutionNotes?: string;
+    resolutionEvidence?: {
+      afterImageUrl: string;
+      notes: string;
+      verification?: ResolutionVerification;
+    };
+  }
+): Promise<RoadCase | null> {
+  try {
+    const { updateReportStatusInSupabase } = await import('./supabase/reports');
+    const updatedInSupabase = await updateReportStatusInSupabase(caseId, status, options);
+    if (updatedInSupabase) {
+      const idx = memoryCases.findIndex(c => c.id.toLowerCase() === caseId.toLowerCase());
+      if (idx !== -1) {
+        memoryCases[idx] = updatedInSupabase;
+      } else {
+        memoryCases.unshift(updatedInSupabase);
+      }
+      syncToLocalStorage();
+      return updatedInSupabase;
+    }
+  } catch (err) {
+    console.warn('Supabase updateStatus notice, falling back to local store:', err);
+  }
+
+  return updateCaseStatus(caseId, status, options);
 }
 
 export function getNotifications(userRole?: 'citizen' | 'authority'): InAppNotification[] {
@@ -335,14 +372,5 @@ export function markNotificationAsRead(id: string): void {
   if (notif) {
     notif.read = true;
     syncToLocalStorage();
-  }
-}
-
-export function resetToDemoData(): void {
-  memoryCases = [...DEMO_CASES];
-  memoryNotifications = [...DEMO_NOTIFICATIONS];
-  if (isBrowser()) {
-    localStorage.setItem(STORAGE_KEY_CASES, JSON.stringify(DEMO_CASES));
-    localStorage.setItem(STORAGE_KEY_NOTIFS, JSON.stringify(DEMO_NOTIFICATIONS));
   }
 }

@@ -25,18 +25,8 @@ import {
   Send,
   X,
   FileCheck,
+  Upload,
 } from 'lucide-react';
-
-const SAMPLE_REPAIR_IMAGES = [
-  {
-    name: 'Asphalt Patch Repair (Roller Compacted)',
-    url: 'https://images.unsplash.com/photo-1541888946425-d0fbb18086f6?auto=format&fit=crop&w=1000&q=80',
-  },
-  {
-    name: 'Restored Concrete Median Divider',
-    url: 'https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=1000&q=80',
-  }
-];
 
 export default function AuthorityCaseDeskPage() {
   const params = useParams();
@@ -278,7 +268,9 @@ export default function AuthorityCaseDeskPage() {
             </div>
 
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
-              {caseData.location.roadName}
+              {(!caseData.location.roadName || caseData.location.roadName.includes('unavailable'))
+                ? 'Road name unavailable'
+                : caseData.location.roadName}
             </h1>
 
             <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-1 font-sans">
@@ -354,7 +346,7 @@ export default function AuthorityCaseDeskPage() {
             <button
               type="button"
               onClick={() => {
-                setResolutionPhoto(caseData.resolutionEvidence?.afterImageUrl || SAMPLE_REPAIR_IMAGES[0].url);
+                setResolutionPhoto(caseData.resolutionEvidence?.afterImageUrl || null);
                 setResolveModalOpen(true);
               }}
               disabled={caseData.status === 'RESOLVED' || actionInProgress}
@@ -657,23 +649,39 @@ export default function AuthorityCaseDeskPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="border border-dashed border-slate-300 dark:border-slate-700 p-4 rounded-xl text-center">
-                    <p className="text-xs text-slate-500 mb-2">
-                      Upload photo or select sample post-repair photograph:
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {SAMPLE_REPAIR_IMAGES.map((s, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setResolutionPhoto(s.url)}
-                          className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-emerald-500 bg-slate-50 dark:bg-slate-800 text-left text-[11px] font-medium transition"
-                        >
-                          <span className="block truncate font-semibold">{s.name}</span>
-                          <span className="text-[10px] text-emerald-600">Sample Evidence</span>
-                        </button>
-                      ))}
+                  <div className="border border-dashed border-slate-300 dark:border-slate-700 p-6 rounded-xl text-center space-y-3">
+                    <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center mx-auto">
+                      <Upload className="w-5 h-5" />
                     </div>
+                    <div>
+                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        Upload field repair completion photograph
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        High-resolution photo showing the resurfaced road, fixed divider, or repaired defect.
+                      </p>
+                    </div>
+                    <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer transition shadow-xs">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Choose Photo File</span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = ev => {
+                              if (ev.target?.result) {
+                                setResolutionPhoto(ev.target.result as string);
+                              }
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
                   </div>
                 )}
               </div>

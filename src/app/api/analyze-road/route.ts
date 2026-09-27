@@ -4,7 +4,7 @@ import { analyzeRoadPhotograph } from '@/lib/ai/road-analysis';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { imageBase64, mimeType, fileName, isDemoSample } = body;
+    const { imageBase64, mimeType } = body;
 
     if (!imageBase64) {
       return NextResponse.json(
@@ -15,9 +15,7 @@ export async function POST(req: NextRequest) {
 
     const analysis = await analyzeRoadPhotograph(
       imageBase64,
-      mimeType || 'image/jpeg',
-      fileName,
-      Boolean(isDemoSample)
+      mimeType || 'image/jpeg'
     );
 
     return NextResponse.json(analysis);

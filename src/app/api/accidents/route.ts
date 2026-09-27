@@ -5,7 +5,7 @@ import { analyzeAccidentIntelligence } from '@/lib/ai/accident-analysis';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { roadName, locality, district, state, latitude, longitude, isDemo } = body;
+    const { roadName, locality, district, state, latitude, longitude } = body;
 
     if (!roadName) {
       return NextResponse.json(
@@ -18,8 +18,7 @@ export async function POST(req: NextRequest) {
     const rawArticles = await searchAccidentNews(
       roadName,
       locality || 'Local Area',
-      district || 'District Administration',
-      Boolean(isDemo)
+      district || 'District Administration'
     );
 
     // 2. Extract structured accident events, geocode, and filter strictly within 100 km radius
@@ -30,8 +29,7 @@ export async function POST(req: NextRequest) {
       district || 'District Administration',
       state || 'State Authority',
       typeof latitude === 'number' ? latitude : undefined,
-      typeof longitude === 'number' ? longitude : undefined,
-      Boolean(isDemo)
+      typeof longitude === 'number' ? longitude : undefined
     );
 
     return NextResponse.json(intelligence);

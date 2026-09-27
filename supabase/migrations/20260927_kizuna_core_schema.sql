@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS public.authorities (
 
 -- 2.2 Master Reports Table (Shared for Web, Mobile, and Authority Portal)
 CREATE TABLE IF NOT EXISTS public.reports (
-  id TEXT PRIMARY KEY, -- Case ID (e.g. 'KZ-2026-00124')
+  id TEXT PRIMARY KEY, -- Case ID (e.g. 'KZ-2026-00124' or 'KZ-DEMO-001')
   citizen_id TEXT NOT NULL DEFAULT 'cit-anon-001',
   image_url TEXT NOT NULL,
   storage_path TEXT, -- Storage path in 'report-images' bucket
@@ -291,6 +291,115 @@ ON CONFLICT (id) DO UPDATE SET
   jurisdiction = EXCLUDED.jurisdiction;
 
 -- ==============================================================================
--- Schema setup complete. Database is ready for live operational intake.
+-- 6. Seed Demo Benchmark Case (KZ-DEMO-001) for Instant Judge Verification
 -- ==============================================================================
 
+INSERT INTO public.reports (
+  id, citizen_id, image_url, storage_path,
+  latitude, longitude, formatted_address, locality, district, state,
+  road_name, road_place_id, road_category, pincode, gps_accuracy, location_source,
+  hazard_type, severity, confidence, description, requires_attention,
+  visible_road_clues, additional_hazards,
+  authority_id, authority_name, authority_department, authority_jurisdiction,
+  routing_confidence, routing_reason,
+  priority, priority_confidence, priority_explanation, priority_factors,
+  status, citizen_report_count,
+  assigned_officer_name, assigned_officer_badge, assigned_officer_division,
+  is_demo, created_at, updated_at, acknowledged_at, assigned_at
+) VALUES
+(
+  'KZ-DEMO-001',
+  'cit-demo-001',
+  'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=1200&q=80',
+  'report-images/KZ-DEMO-001/pothole_nh30.jpg',
+  21.2514,
+  81.5832,
+  'NH-30, Tatibandh Interchange, Raipur, Chhattisgarh 492099',
+  'Tatibandh Interchange',
+  'Raipur',
+  'Chhattisgarh',
+  'NH-30 (Durg-Raipur Highway)',
+  'osm_way_24681357',
+  'national_highway',
+  '492099',
+  4.2,
+  'gps',
+  'pothole',
+  'critical',
+  0.96,
+  'Deep structural crater (approx. 45cm diameter, 12cm depth) located on high-speed lane approach with fractured bitumen edges and exposed wet aggregate.',
+  true,
+  ARRAY['High-speed multi-lane divided carriageway', 'Concrete median barrier on right', 'Heavy commercial freight transit markings'],
+  ARRAY['High risk of two-wheeler rollover', 'Night visibility blindness', 'Sudden vehicular swerving'],
+  'NHAI_RO_CG',
+  'National Highways Authority of India (NHAI)',
+  'Ministry of Road Transport and Highways (MoRTH)',
+  'National Highway corridors NH-30, NH-53, NH-130 traversing Chhattisgarh.',
+  0.98,
+  'Highway NH-30 is a designated National Highway corridor falling directly under statutory maintenance jurisdiction of NHAI RO Raipur.',
+  'CRITICAL',
+  0.95,
+  'Critical risk: severe pothole on high-speed National Highway corridor with 3 historical fatal/serious collisions in public records within 100km radius.',
+  ARRAY['Hazard severity is CRITICAL on high-speed corridor', 'Historical fatality precedents documented in public archives', 'Heavy multi-axle freight traffic volume on NH-30 corridor'],
+  'ASSIGNED',
+  4,
+  'Er. Rajesh Kumar Sharma',
+  'NHAI-RO-AE-4102',
+  'Raipur Highway Maintenance Unit',
+  true,
+  NOW() - INTERVAL '2 hours',
+  NOW() - INTERVAL '30 minutes',
+  NOW() - INTERVAL '1 hour 45 minutes',
+  NOW() - INTERVAL '1 hour 15 minutes'
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Seed Status History for Demo Case
+INSERT INTO public.report_status_history (report_id, status, title, comment, actor, actor_role, created_at)
+VALUES
+(
+  'KZ-DEMO-001',
+  'REPORTED',
+  'Citizen Hazard Logged',
+  'Photograph and GPS location uploaded via KIZUNA Civic Portal.',
+  'Verified Citizen (Anonymous ID: cit-demo-001)',
+  'CITIZEN',
+  NOW() - INTERVAL '2 hours'
+),
+(
+  'KZ-DEMO-001',
+  'AI_ANALYZED',
+  'Groq Vision & Accident Precedents Evaluated',
+  'Groq Vision detected critical pothole. 3 historical accident reports mapped within 100km corridor.',
+  'KIZUNA AI Intelligence Pipeline',
+  'SYSTEM_AI',
+  NOW() - INTERVAL '1 hour 58 minutes'
+),
+(
+  'KZ-DEMO-001',
+  'AUTHORITY_IDENTIFIED',
+  'Statutory Authority Routed',
+  'Matched to NHAI PIU Raipur under National Highways jurisdiction rules.',
+  'Authority Routing Engine',
+  'SYSTEM_AI',
+  NOW() - INTERVAL '1 hour 55 minutes'
+),
+(
+  'KZ-DEMO-001',
+  'ACKNOWLEDGED',
+  'Case Acknowledged',
+  'NHAI Control Center logged intake and scheduled immediate field inspection.',
+  'NHAI RO Raipur Desk',
+  'AUTHORITY',
+  NOW() - INTERVAL '1 hour 45 minutes'
+),
+(
+  'KZ-DEMO-001',
+  'ASSIGNED',
+  'Field Officer Assigned',
+  'Assigned to Er. Rajesh Kumar Sharma (Badge NHAI-RO-AE-4102) for rapid repair dispatch.',
+  'NHAI Project Director',
+  'AUTHORITY',
+  NOW() - INTERVAL '1 hour 15 minutes'
+)
+ON CONFLICT DO NOTHING;

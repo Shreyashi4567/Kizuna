@@ -3,27 +3,23 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { RoadCase } from '@/types';
-import { getAllCases } from '@/lib/store';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PriorityBadge } from '@/components/PriorityBadge';
-import { CaseTypeBadge } from '@/components/CaseTypeBadge';
 import {
-  FileText,
   Search,
   Filter,
-  MapPin,
   ExternalLink,
   PlusCircle,
-  Sparkles,
-  Radio,
+  Inbox,
+  Shield,
 } from 'lucide-react';
 
 export default function MyReportsPage() {
-  const [cases, setCases] = useState<RoadCase[]>(() => getAllCases());
+  const [cases, setCases] = useState<RoadCase[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
-  const [typeFilter, setTypeFilter] = useState<'ALL' | 'LIVE' | 'DEMO'>('ALL');
 
   useEffect(() => {
     fetch('/api/cases')
@@ -33,21 +29,12 @@ export default function MyReportsPage() {
           setCases(data.cases);
         }
       })
-      .catch(err => console.warn('Cases sync notice:', err));
+      .catch(err => console.warn('Cases sync notice:', err))
+      .finally(() => setLoading(false));
   }, []);
-
-  const liveCasesCount = cases.filter(c => !c.isDemo && !c.id.startsWith('KZ-DEMO-')).length;
-  const demoCasesCount = cases.filter(c => Boolean(c.isDemo || c.id.startsWith('KZ-DEMO-'))).length;
 
   const filteredCases = cases
     .filter(c => {
-      const isDemo = Boolean(c.isDemo || c.id.startsWith('KZ-DEMO-'));
-
-      const matchesType =
-        typeFilter === 'ALL' ||
-        (typeFilter === 'LIVE' && !isDemo) ||
-        (typeFilter === 'DEMO' && isDemo);
-
       const matchesSearch =
         c.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         c.location.roadName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -61,16 +48,9 @@ export default function MyReportsPage() {
         priorityFilter === 'ALL' ||
         c.priorityAssessment.priority.toLowerCase() === priorityFilter.toLowerCase();
 
-      return matchesType && matchesSearch && matchesStatus && matchesPriority;
+      return matchesSearch && matchesStatus && matchesPriority;
     })
-    // Sort: Live cases first, then newest
-    .sort((a, b) => {
-      const aLive = !a.isDemo && !a.id.startsWith('KZ-DEMO-');
-      const bLive = !b.isDemo && !b.id.startsWith('KZ-DEMO-');
-      if (aLive && !bLive) return -1;
-      if (!aLive && bLive) return 1;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full space-y-6">
@@ -78,80 +58,41 @@ export default function MyReportsPage() {
       <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-slate-200 dark:border-slate-800">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-              Civic Accountability
+            <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+              <Shield className="w-4 h-4" /> Civic Accountability
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-1">
-            Community Road Reports Docket
+            Community Road Safety Reports
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
-            Search, filter, and track verified road hazard submissions across administrative jurisdictions.
+            Browse submitted hazards, monitor departmental assignments, and verify transparent road repairs.
           </p>
         </div>
 
         <Link
           href="/citizen/report"
-          className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition flex items-center gap-2 active:scale-98"
+          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition flex items-center gap-2"
         >
           <PlusCircle className="w-4 h-4" />
           <span>New Hazard Report</span>
         </Link>
       </div>
 
-      {/* Filter & Search Bar */}
-      <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col md:flex-row items-center gap-4 justify-between">
-        <div className="relative w-full md:w-80">
+      {/* Search and Filters */}
+      <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col lg:flex-row items-center gap-4 justify-between">
+        <div className="relative w-full lg:w-80">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
           <input
             type="text"
-            placeholder="Search Case ID, road, or locality..."
+            placeholder="Search road, case ID, or authority..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          {/* Live vs Demo Segmented Buttons */}
-          <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-0.5 text-xs">
-            <button
-              type="button"
-              onClick={() => setTypeFilter('ALL')}
-              className={`px-3 py-1 rounded-md font-semibold transition ${
-                typeFilter === 'ALL'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              All ({cases.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setTypeFilter('LIVE')}
-              className={`px-3 py-1 rounded-md font-semibold transition flex items-center gap-1 ${
-                typeFilter === 'LIVE'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              <Radio className="w-3 h-3" />
-              <span>Live Reports ({liveCasesCount})</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTypeFilter('DEMO')}
-              className={`px-3 py-1 rounded-md font-semibold transition flex items-center gap-1 ${
-                typeFilter === 'DEMO'
-                  ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              <Sparkles className="w-3 h-3" />
-              <span>Demo ({demoCasesCount})</span>
-            </button>
-          </div>
-
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
           {/* Status Filter */}
           <div className="flex items-center gap-1 text-xs">
             <Filter className="w-3.5 h-3.5 text-slate-400" />
@@ -188,84 +129,98 @@ export default function MyReportsPage() {
         </div>
       </div>
 
-      {/* Reports Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredCases.length === 0 ? (
-          <div className="col-span-full py-16 text-center bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-            <FileText className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-              No matching reports found
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Try adjusting your search criteria or report a new road issue.
-            </p>
-          </div>
-        ) : (
-          filteredCases.map(c => (
-            <div
-              key={c.id}
-              className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs hover:border-blue-400 dark:hover:border-blue-700 transition flex flex-col justify-between group"
-            >
-              <div>
-                <div className="relative aspect-video bg-slate-950 overflow-hidden border-b border-slate-200 dark:border-slate-800">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={c.imageUrl}
-                    alt={c.location.roadName}
-                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                  />
-                  <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
-                    <span className="font-mono text-[11px] font-black px-2 py-0.5 rounded bg-black/80 backdrop-blur-md text-white border border-white/20">
-                      {c.id}
+      {/* Reports Table */}
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-x-auto">
+        <table className="w-full text-left text-xs">
+          <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
+            <tr>
+              <th className="py-3.5 px-4">Case ID</th>
+              <th className="py-3.5 px-4">Hazard &amp; Road Segment</th>
+              <th className="py-3.5 px-4">Assigned Department</th>
+              <th className="py-3.5 px-4">Priority</th>
+              <th className="py-3.5 px-4">Status</th>
+              <th className="py-3.5 px-4">Date Logged</th>
+              <th className="py-3.5 px-4 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70 text-slate-700 dark:text-slate-300">
+            {loading ? (
+              <tr>
+                <td colSpan={7} className="py-12 text-center text-slate-400 font-medium animate-pulse">
+                  Loading community reports from Supabase...
+                </td>
+              </tr>
+            ) : filteredCases.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="py-16 text-center text-slate-400 font-medium">
+                  <div className="max-w-sm mx-auto space-y-3">
+                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+                      <Inbox className="w-6 h-6" />
+                    </div>
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      No reports found
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Reports submitted by citizens will appear here in real-time.
+                    </p>
+                    <Link
+                      href="/citizen/report"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" />
+                      <span>Submit Real Report</span>
+                    </Link>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              filteredCases.map(c => (
+                <tr
+                  key={c.id}
+                  className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition"
+                >
+                  <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-slate-100">
+                    <span>{c.id}</span>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span className="font-semibold text-slate-900 dark:text-slate-100 block">
+                      {c.location.roadName}
                     </span>
-                    <CaseTypeBadge isDemo={c.isDemo} size="sm" />
-                  </div>
-                  <div className="absolute bottom-2.5 right-2.5">
-                    <PriorityBadge priority={c.priorityAssessment.priority} size="sm" />
-                  </div>
-                </div>
-
-                <div className="p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <StatusBadge status={c.status} size="sm" />
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      {new Date(c.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                    <span className="text-[11px] text-slate-500 capitalize">
+                      {c.hazardAnalysis.hazardType.replace('_', ' ')} • {c.location.locality}
                     </span>
-                  </div>
-
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1">
-                    {c.location.roadName}
-                  </h3>
-
-                  <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 line-clamp-1">
-                    <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                    <span>{c.location.locality}, {c.location.district}</span>
-                  </p>
-
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400">
-                    <span className="text-slate-400 block">Assigned Authority:</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 line-clamp-1">
+                  </td>
+                  <td className="py-3.5 px-4 max-w-[200px] truncate">
+                    <span className="font-medium text-slate-800 dark:text-slate-200 block truncate">
                       {c.authorityRouting.authorityName}
                     </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <span className="text-[11px] text-slate-500 font-medium">
-                  {c.timeline.length} Status Events
-                </span>
-                <Link
-                  href={`/citizen/reports/${c.id}`}
-                  className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                >
-                  <span>Track Case</span>
-                  <ExternalLink className="w-3 h-3" />
-                </Link>
-              </div>
-            </div>
-          ))
-        )}
+                    <span className="text-[11px] text-slate-500 capitalize">
+                      {c.location.roadCategory?.replace('_', ' ') || 'Corridor'}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <PriorityBadge priority={c.priorityAssessment.priority} size="sm" />
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <StatusBadge status={c.status} size="sm" />
+                  </td>
+                  <td className="py-3.5 px-4 font-mono text-[11px] text-slate-400">
+                    {new Date(c.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                  </td>
+                  <td className="py-3.5 px-4 text-right">
+                    <Link
+                      href={`/citizen/reports/${c.id}`}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 font-semibold inline-flex items-center gap-1 shadow-2xs transition"
+                    >
+                      <span>Track</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

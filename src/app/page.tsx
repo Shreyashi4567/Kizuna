@@ -46,11 +46,11 @@ export default function HomePage() {
               </Link>
 
               <Link
-                href="/citizen/reports/KZ-DEMO-001"
-                className="px-6 py-3.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800 font-semibold text-sm transition flex items-center gap-2"
+                href="/citizen/reports"
+                className="px-6 py-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-semibold text-sm transition flex items-center gap-2"
               >
-                <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                <span>Try Demo Case (NH-30)</span>
+                <FileCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span>Track Public Reports</span>
               </Link>
 
               <Link
@@ -213,7 +213,7 @@ export default function HomePage() {
                 3
               </div>
               <span className="text-xs font-bold text-slate-900 dark:text-white">Road Segment</span>
-              <span className="text-[11px] text-slate-500 mt-1">Google Roads & geocoding</span>
+              <span className="text-[11px] text-slate-500 mt-1">OpenStreetMap & Nominatim</span>
             </div>
 
             {/* Step 4 */}
@@ -255,36 +255,36 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured Interactive Demo Spotlight */}
+      {/* Live Operational Platform Showcase */}
       <section className="py-16 bg-white dark:bg-slate-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-gradient-to-r from-blue-900 to-indigo-950 rounded-2xl p-8 sm:p-12 text-white shadow-xl relative overflow-hidden">
             <div className="relative z-10 max-w-2xl">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 text-xs font-bold uppercase tracking-wider mb-4 border border-amber-400/30">
-                <Sparkles className="w-3.5 h-3.5" /> Ready for Hackathon Evaluation
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-400/20 text-emerald-300 text-xs font-bold uppercase tracking-wider mb-4 border border-emerald-400/30">
+                <Sparkles className="w-3.5 h-3.5" /> Live Operational MVP
               </span>
               <h2 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">
-                Experience the Complete 2-Minute Demo Flow
+                Real-Time Citizen Intake &amp; Authority Command
               </h2>
               <p className="mt-4 text-sm sm:text-base text-blue-100/90 leading-relaxed">
-                Test Case <span className="font-mono font-bold text-white">KZ-DEMO-001</span>: High-severity pothole on NH-30 Tatibandh corridor with 7 public collision archives, routed to NHAI PIU Raipur, with full status timeline and verification preview.
+                Capture genuine road photographs and browser GPS coordinates. KIZUNA evaluates hazard severity via Groq Vision AI, queries 100km corridor accident precedent archives, identifies statutory jurisdiction, and publishes directly to the Authority Command Docket.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-4">
                 <Link
-                  href="/citizen/reports/KZ-DEMO-001"
-                  className="px-6 py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-sm shadow-md transition flex items-center gap-2"
+                  href="/citizen/report"
+                  className="px-6 py-3.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-bold text-sm shadow-md transition flex items-center gap-2"
                 >
-                  <span>Launch Demo Case</span>
+                  <span>Report Road Hazard</span>
                   <ArrowRight className="w-4 h-4" />
                 </Link>
 
                 <Link
-                  href="/authority/cases/KZ-DEMO-001"
+                  href="/authority/dashboard"
                   className="px-6 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold text-sm transition flex items-center gap-2"
                 >
                   <Landmark className="w-4 h-4" />
-                  <span>Authority Action Desk</span>
+                  <span>Authority Command Center</span>
                 </Link>
               </div>
             </div>
